@@ -19,8 +19,9 @@ def upload_file_to_google_drive(local_path: str, parent_id: str, access_token: s
 
     body = (
         f"--{boundary}\r\n"
-        "Content-Type: application/json; charset=utf-8\r\n\r\n"
+        "Content-Type: application/json; charset=UTF-8\r\n\r\n"
         f"{json.dumps(metadata)}\r\n"
+        f"--{boundary}\r\n"
         "Content-Type: application/octet-stream\r\n\r\n"
     ).encode("utf-8") + file_data + f"\r\n--{boundary}--".encode("utf-8")
 

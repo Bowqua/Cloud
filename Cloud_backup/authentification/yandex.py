@@ -33,6 +33,7 @@ def start_yandex_auth(callback):
         auth_url = (
             f"https://oauth.yandex.ru/authorize?"
             f"response_type=code&client_id={config.YANDEX_CLIENT_ID}"
+            f"&scope=cloud_api:disk.read_write"
         )
 
         code = get_oauth_code(auth_url)
