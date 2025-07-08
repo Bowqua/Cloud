@@ -1,9 +1,13 @@
 ﻿import threading
 import os
 import tkinter as tk
+
+from Cloud_backup.upload.yandex_uploader import download_file_from_yandex
 from upload.google_uploader import upload_file_to_google_drive, sync_directory_to_drive, get_or_create_folder_google_drive
-from upload.yandex_uploader import upload_file_to_yandex_disk, sync_directory_to_yandex, get_or_create_folder_on_yandex
-from tkinter import ttk, messagebox, filedialog
+from upload.yandex_uploader import upload_file_to_yandex_disk, sync_directory_to_yandex, get_or_create_folder_on_yandex, \
+    list_yandex_directory
+
+from tkinter import ttk, messagebox, filedialog, Button, Listbox, Scrollbar
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from tokens import get_token, set_token
 
@@ -68,6 +72,47 @@ class CloudBackup(TkinterDnD.Tk):
 
         self.yandex_progress = ttk.Progressbar(self.yandex_frame, mode="determinate")
         self.yandex_progress.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(5, 10))
+
+        list_frame = ttk.Frame(self.yandex_frame)
+        list_frame.grid(row=3, column=0, sticky="nsew", padx=10, pady=(5, 0))
+        list_frame.rowconfigure(0, weight=1)
+        list_frame.columnconfigure(0, weight=1)
+
+        self.yandex_files_list = Listbox(list_frame, background="white")
+        self.yandex_files_list.grid(row=0, column=0, sticky="nsew")
+
+        scrollbar = Scrollbar(list_frame, orient="vertical", command=self.yandex_files_list.yview)
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        self.yandex_files_list.config(yscrollcommand=scrollbar.set)
+
+        buttons_frame = ttk.Frame(self.yandex_frame)
+        buttons_frame.grid(row=4, column=0, pady=10)
+
+        self.download_button = ttk.Button(buttons_frame, text="Download", command=self.download_selected_yandex_file)
+        self.download_button.pack(side="left", padx=5)
+
+        self.update_button = ttk.Button(buttons_frame, text="Update listings", command=self.start_list_update_thread)
+        self.update_button.pack(side="left", padx=5)
+
+        if self.yandex_token:
+            self.start_list_update_thread()
+
+
+    def download_selected_files_yandex(self):
+        selected = self.istbox.curselection()
+        if not selected:
+            messagebox.showwarning("Yandex Disk", "Please select a file to download")
+            return
+        entry = self.listbox.get(selected[0])
+        name = entry.split(" ")[0]
+        local = filedialog.asksaveasfilename(initialfile=name)
+        if not local:
+            return
+        try:
+            download_file_from_yandex(f"Backup/{name}", local, self.yandex_token)
+            messagebox.showinfo("Yandex Disk", f"Downloaded {name}")
+        except Exception as e:
+            messagebox.showerror("Yandex Disk", f"Error while downloading: {e}")
 
 
     def auth_google(self):
@@ -184,3 +229,68 @@ class CloudBackup(TkinterDnD.Tk):
             self.google_progress["value"] = percent
         else:
             self.yandex_progress["value"] = percent
+
+    def refresh_listing(self):
+        try:
+            items = list_yandex_directory("Backup", self.yandex_token)
+
+            if not items:
+                self.listbox.insert("end", "No files found in Backup")
+                return
+        except Exception as e:
+            messagebox.showerror("Yandex Disk", f"Error checking file: {e}")
+            return
+
+        self.listbox.delete(0, "end")
+        for item in items:
+            self.listbox.insert("end", f"{item['name']} ({item['type']})")
+
+    def start_list_update_thread(self):
+        if not self.yandex_token:
+            messagebox.showerror("Error", "Please log in to Yandex first.")
+            return
+        thread = threading.Thread(target=self.update_yandex_listings, daemon=True)
+        thread.start()
+
+    def update_yandex_listings(self):
+        self.after(0, self.yandex_files_list.delete, 0, "end")
+        try:
+            files = list_yandex_directory("/Backup", self.yandex_token)
+            if not files:
+                self.after(0, self.yandex_files_list.insert, "end", "No files found in /Backup")
+            else:
+                for item in files:
+                    self.after(0, self.yandex_files_list.insert, "end", item['name'])
+        except Exception as e:
+            self.after(0, self.yandex_files_list.insert, "end", f"Error: {e}")
+
+    def download_selected_yandex_file(self):
+        selected_indices = self.yandex_files_list.curselection()
+        if not selected_indices:
+            messagebox.showwarning("Warning", "Please select a file to download.")
+            return
+
+        filename = self.yandex_files_list.get(selected_indices[0])
+        local_dir = filedialog.askdirectory(title="Choose where to save the file")
+        if not local_dir:
+            return
+
+        local_path = os.path.join(local_dir, filename)
+        remote_path = f"/Backup/{filename}"
+
+        thread = threading.Thread(target=self.download_work, args=(remote_path, local_path), daemon=True)
+        thread.start()
+
+    def download_work(self, remote_path, local_path):
+        try:
+            self.after(0, self.update_progress, "yandex", 0)
+            download_file_from_yandex(remote_path, local_path, self.yandex_token)
+            self.after(0, lambda: messagebox.showinfo("Success",
+                                                          f"File '{os.path.basename(local_path)}' downloaded successfully."))
+            self.after(0, self.update_progress, "yandex", 100)
+        except Exception as e:
+            self.after(0, lambda: messagebox.showerror("Error", f"Failed to download file: {e}"))
+        finally:
+            self.after(1000, self.update_progress, "yandex", 0)
+
+
