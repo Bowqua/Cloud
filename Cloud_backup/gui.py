@@ -2,7 +2,7 @@
 import os
 import tkinter as tk
 from upload.google_uploader import upload_file_to_google_drive, sync_directory_to_drive, get_or_create_folder_google_drive
-from upload.yandex_uploader import upload_file_to_yandex_disk, sync_directory_to_yandex, create_folder_on_yandex
+from upload.yandex_uploader import upload_file_to_yandex_disk, sync_directory_to_yandex, get_or_create_folder_on_yandex
 from tkinter import ttk, messagebox, filedialog
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from tokens import get_token, set_token
@@ -89,7 +89,9 @@ class CloudBackup(TkinterDnD.Tk):
     def on_yandex_auth_done(self, token):
         set_token("yandex", token)
         self.yandex_token = token
-        self.yandex_button.config(text="Choose files", command=self.choose_yandex_files)
+        self.after(0, lambda: self.yandex_button.config(
+            text="Choose files", command=self.choose_yandex_files, state="normal"
+        ))
 
 
     def on_drop_google(self, event):
@@ -98,6 +100,9 @@ class CloudBackup(TkinterDnD.Tk):
 
 
     def on_drop_yandex(self, event):
+        if not getattr(self, "yandex_token", None):
+            messagebox.showwarning("Yandex Disk", "Please login to Yandex Disk first")
+            return
         paths = self.tk.splitlist(event.data)
         self.start_upload_thread(paths, service="yandex")
 
@@ -109,9 +114,13 @@ class CloudBackup(TkinterDnD.Tk):
 
 
     def choose_yandex_files(self):
-        paths = filedialog.askopenfilenames()
-        if paths:
-            self.start_upload_thread(paths, service="yandex")
+        if not getattr(self, "yandex_token", None):
+            messagebox.showwarning("Yandex Disk", "Please login to Yandex Disk")
+            return
+        paths = filedialog.askopenfilenames(title="Select files to upload")
+        if not paths:
+            return
+        self.start_upload_thread(paths, service="yandex")
 
 
     def start_upload_thread(self, paths, service):
@@ -122,7 +131,7 @@ class CloudBackup(TkinterDnD.Tk):
     def upload_work(self, paths, service):
         total = len(paths)
         if service == "yandex":
-            create_folder_on_yandex("Backup", self.yandex_token)
+            get_or_create_folder_on_yandex("Backup", self.yandex_token)
             base_remote = "Backup"
         else:
             base_remote = get_or_create_folder_google_drive(

@@ -31,9 +31,11 @@ def get_oauth_code(auth_url):
 def start_yandex_auth(callback):
     def flow():
         auth_url = (
-            f"https://oauth.yandex.ru/authorize?"
-            f"response_type=code&client_id={config.YANDEX_CLIENT_ID}"
-            f"&scope=cloud_api:disk.read_write"
+            "https://oauth.yandex.ru/authorize?"
+            "response_type=code&"
+            "client_id=a5d8d8a6358345a68ea38ebd34cfa8a3&"
+            "redirect_uri=http%3A%2F%2Flocalhost%3A8080&"
+            "scope=cloud_api:disk.read%20cloud_api:disk.write%20login:email"
         )
 
         code = get_oauth_code(auth_url)

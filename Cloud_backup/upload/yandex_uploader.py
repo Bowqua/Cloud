@@ -17,23 +17,26 @@ def upload_file_to_yandex_disk(local_path: str, remote_path: str, access_token: 
         response.raise_for_status()
 
 
-def create_folder_on_yandex(remote_path: str, access_token: str):
+def get_or_create_folder_on_yandex(remote_path: str, access_token: str):
     headers = {"Authorization": f"OAuth {access_token}"}
-    params = {"path": remote_path}
-    response = requests.put("https://cloud-api.yandex.net/v1/disk/resources", headers=headers, params=params)
+    response = requests.get("https://cloud-api.yandex.net/v1/disk/resources", headers=headers, params={"path": remote_path})
+    if response.status_code == 200:
+        return
+    if response.status_code in (403, 409):
+        return
 
-    if response.status_code not in (201, 409):
-        response.raise_for_status()
+    response = requests.put("https://cloud-api.yandex.net/v1/disk/resources", headers=headers, params={"path": remote_path})
+    response.raise_for_status()
 
 
 def sync_directory_to_yandex(local_directory: str, remote_directory: str, access_token: str):
-    create_folder_on_yandex(remote_directory, access_token)
+    get_or_create_folder_on_yandex(remote_directory, access_token)
     for root, directories, files in os.walk(local_directory):
         relative_path = os.path.relpath(root, local_directory)
         current_remote = remote_directory if relative_path == '.' else f"{remote_directory}/{relative_path}"
 
         for directory in directories:
-            create_folder_on_yandex(f"{current_remote}/{directory}", access_token)
+            get_or_create_folder_on_yandex(f"{current_remote}/{directory}", access_token)
 
         for file_name in files:
             local_path = os.path.join(root, file_name)
