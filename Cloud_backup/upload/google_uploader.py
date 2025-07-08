@@ -32,15 +32,37 @@ def upload_file_to_google_drive(local_path: str, parent_id: str, access_token: s
     return response.json()
 
 
-def create_folder_google_drive(name: str, parent_id: str, access_token: str) -> str:
+def get_or_create_folder_google_drive(name: str, parent_id: str, access_token: str) -> str:
+    headers = {"Authorization": f"Bearer {access_token}"}
+    q = (
+        f"name = '{name}' "
+        f"and mimeType = 'application/vnd.google-apps.folder' "
+        f"and '{parent_id}' in parents "
+        f"and trashed = false"
+    )
+    response = requests.get(
+        "https://www.googleapis.com/drive/v3/files",
+        headers=headers,
+        params={"q": q, "fields": "files(id, name)", "spaces": "drive"}
+    )
+    response.raise_for_status()
+    files = response.json().get("files", [])
+    if files:
+        return files[0]["id"]
+
     payload = {"name": name, "mimeType": "application/vnd.google-apps.folder"}
     if parent_id:
         payload["parents"] = [parent_id]
+    headers["Content-Type"] = "application/json"
+    response = requests.post(
+        "https://www.googleapis.com/drive/v3/files",
+        headers=headers,
+        json=payload
+    )
 
-    headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
-    response = requests.post("https://www.googleapis.com/drive/v3/files", headers=headers, json=payload)
+    # headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
+    # response = requests.post("https://www.googleapis.com/drive/v3/files", headers=headers, json=payload)
     response.raise_for_status()
-
     return response.json()["id"]
 
 
@@ -51,7 +73,7 @@ def sync_directory_to_drive(local_directory: str, parent_id: str, access_token: 
 
         for dir in directories:
             local_subdirectory = os.path.join(root, dir)
-            new_folder_id = create_folder_google_drive(dir, current_parent, access_token)
+            new_folder_id = get_or_create_folder_google_drive(dir, current_parent, access_token)
             folder_map[local_subdirectory] = new_folder_id
 
         for file_name in files:

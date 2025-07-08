@@ -19,12 +19,14 @@ class CallbackHandler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         return
 
+
 def get_oauth_code(auth_url):
     port = 8080
     server = HTTPServer(('localhost', port), CallbackHandler)
     webbrowser.open(auth_url)
     server.handle_request()
     return getattr(server, 'auth_code', None)
+
 
 def start_google_auth(callback):
     def flow():

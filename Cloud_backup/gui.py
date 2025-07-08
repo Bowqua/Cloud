@@ -1,7 +1,7 @@
 ﻿import threading
 import os
 import tkinter as tk
-from upload.google_uploader import upload_file_to_google_drive, sync_directory_to_drive, create_folder_google_drive
+from upload.google_uploader import upload_file_to_google_drive, sync_directory_to_drive, get_or_create_folder_google_drive
 from upload.yandex_uploader import upload_file_to_yandex_disk, sync_directory_to_yandex, create_folder_on_yandex
 from tkinter import ttk, messagebox, filedialog
 from tkinterdnd2 import TkinterDnD, DND_FILES
@@ -125,7 +125,7 @@ class CloudBackup(TkinterDnD.Tk):
             create_folder_on_yandex("Backup", self.yandex_token)
             base_remote = "Backup"
         else:
-            base_remote = create_folder_google_drive(
+            base_remote = get_or_create_folder_google_drive(
                 "Backup", parent_id="root", access_token=self.google_token
             )
 
