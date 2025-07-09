@@ -1,16 +1,14 @@
-﻿import json
-import threading
+﻿import threading
 import os
 import tkinter as tk
-
 from requests import HTTPError
 from Cloud_backup.upload.google_uploader import list_google_drive_files, download_files_from_google_drive
 from Cloud_backup.upload.yandex_uploader import download_file_from_yandex
 from upload.google_uploader import upload_file_to_google_drive, sync_directory_to_drive, get_or_create_folder_google_drive
 from upload.yandex_uploader import upload_file_to_yandex_disk, sync_directory_to_yandex, get_or_create_folder_on_yandex, \
     list_yandex_directory
-
-from tkinter import ttk, messagebox, filedialog, Button, Listbox, Scrollbar
+from Cloud_backup.utils import compress_path
+from tkinter import ttk, messagebox, filedialog, Listbox, Scrollbar
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from tokens import get_token, set_token
 from googleapiclient.discovery import build
@@ -122,6 +120,7 @@ class CloudBackup(TkinterDnD.Tk):
 
         self.google_files_data = []
 
+
     def download_selected_files_yandex(self):
         selected = self.istbox.curselection()
         if not selected:
@@ -209,44 +208,32 @@ class CloudBackup(TkinterDnD.Tk):
                 "Backup", parent_id="root", access_token=access_token
             )
 
-        for i, local_path in enumerate(paths, start=1):
-            name = os.path.basename(local_path)
+        for i, original_path in enumerate(paths, start=1):
             try:
-                if os.path.isdir(local_path):
-                    if service == "yandex":
-                        sync_directory_to_yandex(
-                            local_directory=local_path,
-                            remote_directory=f"{base_remote}/{name}",
-                            access_token=self.yandex_token
-                        )
-                    else:
-                        sync_directory_to_drive(
-                            local_directory=local_path,
-                            parent_id=base_remote,
-                            access_token=self.google_token
-                        )
+                archive_path = compress_path(original_path)
+                archive_name = os.path.basename(archive_path)
+                if service == "yandex":
+                    upload_file_to_yandex_disk(
+                        archive_path,
+                        f"{base_remote}/{archive_name}",
+                        self.yandex_token
+                    )
                 else:
-                    if service == "yandex":
-                        upload_file_to_yandex_disk(
-                            local_path,
-                            f"{base_remote}/{name}",
-                            self.yandex_token
-                        )
-                    else:
-                        upload_file_to_google_drive(
-                            local_path,
-                            parent_id=base_remote,
-                            access_token=self.google_token
-                        )
+                    upload_file_to_google_drive(
+                        archive_path,
+                        parent_id=base_remote,
+                        access_token=self.google_token
+                    )
+                os.remove(archive_path)
 
             except Exception as e:
-                print(f"Error uploading {local_path}: {e}")
+                print(f"Error uploading {original_path}: {e}")
 
             percent = int(i / total * 100)
             self.after(0, lambda p=percent, svc=service: self.update_progress(svc, p))
 
         self.after(0, lambda: messagebox.showinfo(
-            "Ready", f"Uploaded {total} items в {service}"
+            "Ready", f"Uploaded {total} items to {service}"
         ))
 
 
@@ -348,10 +335,9 @@ class CloudBackup(TkinterDnD.Tk):
     def update_google_listings(self):
         self.after(0, self.google_files_list.delete, 0, 'end')
         self.google_files_data.clear()
-
         service = self.get_google_service()
-        if not service: return
-
+        if not service:
+            return
         try:
             backup_folder_id = get_or_create_folder_google_drive("Backup", parent_id="root", access_token=self.google_token)
             items = list_google_drive_files(service, folder_id=backup_folder_id)
@@ -377,7 +363,6 @@ class CloudBackup(TkinterDnD.Tk):
         file_info = self.google_files_data[idx]
         name = file_info['name']
         file_id = file_info['id']
-
         local = filedialog.asksaveasfilename(initialfile=name)
         if not local:
             return
@@ -398,4 +383,3 @@ class CloudBackup(TkinterDnD.Tk):
         except Exception as e:
             messagebox.showerror("Google Auth Error", f"Failed to build Google service: {e}")
             return None
-

@@ -1,38 +1,26 @@
-﻿import json
-import os
-import uuid
+﻿import os
 import requests
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
-
+from googleapiclient.http import MediaFileUpload
 from Cloud_backup.utils import retry
 
 def upload_file_to_google_drive(local_path: str, parent_id: str, access_token: str) -> dict:
-    boundary = uuid.uuid4().hex
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": f"multipart/related; boundary={boundary}",
+    file_metadata = {
+        'name': os.path.basename(local_path),
+        'parents': [parent_id] if parent_id else []
     }
+    media = MediaFileUpload(local_path, mimetype='application/octet-stream', chunksize=10 * 1024 * 1024, resumable=True)
+    service = build('drive', 'v3', credentials=Credentials(token=access_token))
+    request = service.files().create(body=file_metadata, media_body=media, fields='id')
+    response = None
+    while response is None:
+        status, response = request.next_chunk()
+        if status:
+            print(f"Uploaded {int(status.progress() * 100)}%")
 
-    metadata = {"name": os.path.basename(local_path)}
-    if parent_id:
-        metadata["parents"] = [parent_id]
-
-    with open(local_path, "rb") as f:
-        file_data = f.read()
-
-    body = (
-        f"--{boundary}\r\n"
-        "Content-Type: application/json; charset=UTF-8\r\n\r\n"
-        f"{json.dumps(metadata)}\r\n"
-        f"--{boundary}\r\n"
-        "Content-Type: application/octet-stream\r\n\r\n"
-    ).encode("utf-8") + file_data + f"\r\n--{boundary}--".encode("utf-8")
-
-    url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"
-    response = requests.post(url, headers=headers, data=body)
-    response.raise_for_status()
-
-    return response.json()
+    return response
 
 
 def get_or_create_folder_google_drive(name: str, parent_id: str, access_token: str) -> str:
@@ -63,8 +51,6 @@ def get_or_create_folder_google_drive(name: str, parent_id: str, access_token: s
         json=payload
     )
 
-    # headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
-    # response = requests.post("https://www.googleapis.com/drive/v3/files", headers=headers, json=payload)
     response.raise_for_status()
     return response.json()["id"]
 
@@ -114,5 +100,3 @@ def download_files_from_google_drive(service, file_id, local_path):
             status, done = downloader.next_chunk()
 
     return local_path
-
-

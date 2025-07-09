@@ -18,7 +18,6 @@ def get_token(service: str) -> str | None:
     return load_tokens().get(service)
 
 
-
 def set_token(service: str, token: str):
     tokens = load_tokens()
     tokens[service] = token
