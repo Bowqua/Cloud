@@ -2,6 +2,9 @@
 import os
 import uuid
 import requests
+from googleapiclient.http import MediaIoBaseDownload
+
+from Cloud_backup.utils import retry
 
 def upload_file_to_google_drive(local_path: str, parent_id: str, access_token: str) -> dict:
     boundary = uuid.uuid4().hex
@@ -79,3 +82,37 @@ def sync_directory_to_drive(local_directory: str, parent_id: str, access_token: 
         for file_name in files:
             local_path = os.path.join(root, file_name)
             upload_file_to_google_drive(local_path, current_parent, access_token)
+
+
+@retry(max_attempts=4)
+def list_google_drive_files(service, folder_id="root"):
+    items = []
+    page_token = None
+    while True:
+        response = service.files().list(
+            q = f"'{folder_id}' in parents and trashed = false",
+            fields = "nextPageToken, files(id, name, mimeType, size, modifiedTime)",
+            pageToken = page_token,
+            pageSize = 1000,
+        ).execute()
+
+        items.extend(response.get("files", []))
+        page_token = response.get("nextPageToken")
+        if not page_token:
+            break
+
+    return items
+
+
+@retry(max_attempts=4)
+def download_files_from_google_drive(service, file_id, local_path):
+    request = service.files().get_media(fileId=file_id)
+    with open(local_path, "wb") as f:
+        downloader = MediaIoBaseDownload(f, request)
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+
+    return local_path
+
+
