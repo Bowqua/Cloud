@@ -115,7 +115,7 @@ class CloudBackup(TkinterDnD.Tk):
         self.download_button_google = ttk.Button(google_buttons_frame, text="Download", command=self.download_google)
         self.download_button_google.pack(side="left", padx=5)
 
-        self.refresh_button_google = ttk.Button(google_buttons_frame, text="Update Listings", command=self.refresh_listing_google)
+        self.refresh_button_google = ttk.Button(google_buttons_frame, text="Update listings", command=self.refresh_listing_google)
         self.refresh_button_google.pack(side="left", padx=5)
 
         self.google_files_data = []
