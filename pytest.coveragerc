@@ -1,0 +1,8 @@
+[run]
+source = Cloud_backup
+omit = 
+    Cloud_backup/config.py
+    Cloud_backup/gui.py
+    Cloud_backup/main.py
+    Cloud_backup/tokens.py
+    Cloud_backup/tests/*

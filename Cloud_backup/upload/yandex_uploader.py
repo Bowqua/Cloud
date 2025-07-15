@@ -54,6 +54,10 @@ def list_yandex_directory(remote_path: str, access_token: str) -> list[dict]:
     headers = {"Authorization": f"OAuth {access_token}"}
     params = {"path": remote_path, "limit": 500}
     response = requests.get(url, headers=headers, params=params)
+
+    if response.status_code == 404:
+        return []
+
     response.raise_for_status()
     data = response.json()
 

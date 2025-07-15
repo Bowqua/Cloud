@@ -74,13 +74,14 @@ def sync_directory_to_drive(local_directory: str, parent_id: str, access_token: 
 def list_google_drive_files(service, folder_id="root"):
     items = []
     page_token = None
+    files_client = service.files() if callable(service.files) else service.files
     while True:
-        response = service.files().list(
-            q = f"'{folder_id}' in parents and trashed = false",
-            fields = "nextPageToken, files(id, name, mimeType, size, modifiedTime)",
-            pageToken = page_token,
-            pageSize = 1000,
-        ).execute()
+        response = files_client.list(
+        q = f"'{folder_id}' in parents and trashed = false",
+        fields = "nextPageToken, files(id, name, mimeType, size, modifiedTime)",
+        pageToken = page_token,
+        pageSize = 1000,
+    ).execute()
 
         items.extend(response.get("files", []))
         page_token = response.get("nextPageToken")
@@ -92,7 +93,8 @@ def list_google_drive_files(service, folder_id="root"):
 
 @retry(max_attempts=4)
 def download_files_from_google_drive(service, file_id, local_path):
-    request = service.files().get_media(fileId=file_id)
+    files_client = service.files() if callable(service.files) else service.files
+    request = files_client.get_media(fileId=file_id)
     with open(local_path, "wb") as f:
         downloader = MediaIoBaseDownload(f, request)
         done = False
