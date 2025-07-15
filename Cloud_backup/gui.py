@@ -39,7 +39,7 @@ class CloudBackup(TkinterDnD.Tk):
         else:
             self.google_token = None
 
-        ttk.Label(self.google_frame, text="Move files here") \
+        ttk.Label(self.google_frame, text="Move files here ->") \
             .grid(row=1, column=0, sticky="w", padx=(10, 5))
 
         self.google_drop = tk.Frame(self.google_frame, relief="sunken", borderwidth=1, height=30, background='white')
@@ -65,7 +65,7 @@ class CloudBackup(TkinterDnD.Tk):
         else:
             self.yandex_token = None
 
-        ttk.Label(self.yandex_frame, text="Move files here") \
+        ttk.Label(self.yandex_frame, text="Move files here ->") \
             .grid(row=1, column=0, sticky="w", padx=(10, 5))
 
         self.yandex_drop = tk.Frame(self.yandex_frame, relief="sunken", borderwidth=1, height=30, background='white')
@@ -271,6 +271,9 @@ class CloudBackup(TkinterDnD.Tk):
     def update_yandex_listings(self):
         self.after(0, self.yandex_files_list.delete, 0, "end")
         try:
+            if not getattr(self, "yandex_token", None):
+                self.after(0, self.yandex_files_list.insert, "end", "Please sign in to Yandex Disk")
+                return
             files = list_yandex_directory("Backup", self.yandex_token)
         except HTTPError as e:
             if e.response.status_code == 404:
@@ -334,6 +337,9 @@ class CloudBackup(TkinterDnD.Tk):
 
     def update_google_listings(self):
         self.after(0, self.google_files_list.delete, 0, 'end')
+        if not getattr(self, "google_token", None):
+            self.google_files_list.insert('end', "Please sign in to Google")
+            return
         self.google_files_data.clear()
         service = self.get_google_service()
         if not service:
